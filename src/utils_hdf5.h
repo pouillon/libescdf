@@ -54,6 +54,8 @@ escdf_errno_t utils_hdf5_read_dbl_array(hid_t loc_id, const char *name,
                                         double **array, hsize_t *dims,
                                         unsigned int ndims, double range[2]);
 
+escdf_errno_t utils_hdf5_create_group(hid_t loc_id, const char *path, hid_t *group_pt);
+
 escdf_errno_t utils_hdf5_create_dataset(hid_t loc_id, const char *name,
                                         hid_t type_id, hsize_t *dims, unsigned
                                         int ndims, hid_t *dtset_pt);
@@ -63,4 +65,17 @@ escdf_errno_t utils_hdf5_write_attr(hid_t loc_id, const char *name,
                                     unsigned int ndims, hid_t mem_type_id,
                                     const void *buf);
 
+escdf_errno_t utils_hdf5_write_dataset(hid_t dtset_id,
+                                       const void *buf,
+                                       hid_t mem_type_id,
+                                       const hsize_t *start,
+                                       const hsize_t *count,
+                                       const hsize_t *stride);
+
+escdf_errno_t utils_hdf5_read_dataset(hid_t dtset_id,
+                                      void *buf,
+                                      hid_t mem_type_id,
+                                      const hsize_t *start,
+                                      const hsize_t *count,
+                                      const hsize_t *stride);
 #endif

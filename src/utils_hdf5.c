@@ -19,6 +19,7 @@
 
 #include <stdbool.h>
 #include <hdf5.h>
+#include <string.h>
 
 #include "escdf_error.h"
 #include "utils_hdf5.h"
@@ -63,7 +64,7 @@ escdf_errno_t utils_hdf5_check_shape(hid_t dtspace_id, hsize_t *dims,
         goto cleanup_dims;
     }
     for (i = 0; i < ndims; i++) {
-        if (dims_v[i] != dims[i] || maxdims_v[i] != dims[i]) {
+        if (dims_v[i] != dims[i] || maxdims_v[i] < dims[i]) {
             DEFER_FUNC_ERROR(ESCDF_ERROR_DIM);
             goto cleanup_dims;
         }
@@ -252,6 +253,31 @@ escdf_errno_t utils_hdf5_read_dbl_array(hid_t loc_id, const char *name,
     return ESCDF_SUCCESS;
 }
 
+escdf_errno_t utils_hdf5_create_group(hid_t loc_id, const char *path, hid_t *group_pt)
+{
+    char *token, *lpath;
+    hid_t group_id;
+
+    group_id = loc_id;
+    lpath = strdup(path);
+    for (token = strtok(lpath, "/"); token != NULL; token = strtok(NULL, "/")) {
+        if (utils_hdf5_check_present(group_id, token)) {
+            group_id = H5Gopen(group_id, path, H5P_DEFAULT);
+        } else {
+            group_id = H5Gcreate(group_id, token, H5P_DEFAULT, H5P_DEFAULT, H5P_DEFAULT);
+        }
+        DEFER_TEST_ERROR(group_id >= 0, ESCDF_ERROR);
+    }
+    free(lpath);
+
+    RETURN_ON_DEFERRED_ERROR
+
+    if (group_pt != NULL)
+        *group_pt = group_id;
+
+    return ESCDF_SUCCESS;
+}
+
 escdf_errno_t utils_hdf5_create_dataset(hid_t loc_id, const char *name,
                                         hid_t type_id, hsize_t *dims,
                                         unsigned int ndims, hid_t *dtset_pt)
@@ -332,3 +358,128 @@ escdf_errno_t utils_hdf5_write_attr(hid_t loc_id, const char *name,
     return err;
 }
 
+escdf_errno_t utils_hdf5_write_dataset(hid_t dtset_id,
+                                       const void *buf,
+                                       hid_t mem_type_id,
+                                       const hsize_t *start,
+                                       const hsize_t *count,
+                                       const hsize_t *stride)
+{
+    hid_t memspace_id, diskspace_id, plist;
+    herr_t err_id;
+    hssize_t len;
+
+    /* disk use the start, count and stride. */
+    if ((diskspace_id = H5Dget_space(dtset_id)) < 0) {
+        RETURN_WITH_ERROR(diskspace_id);
+    }
+
+    if (start && count) {
+        if ((err_id = H5Sselect_hyperslab(diskspace_id, H5S_SELECT_SET,
+                                          start, stride, count, NULL)) < 0) {
+            H5Sclose(diskspace_id);
+            RETURN_WITH_ERROR(err_id);
+        }
+    } else {
+        if ((err_id = H5Sselect_all(diskspace_id)) < 0) {
+            H5Sclose(diskspace_id);
+            RETURN_WITH_ERROR(err_id);
+        }
+    }
+    if ((len = H5Sget_select_npoints(diskspace_id)) < 0) {
+        H5Sclose(diskspace_id);
+        RETURN_WITH_ERROR(len);
+    }
+    if (!len) {
+        if ((err_id = H5Sselect_none(diskspace_id)) < 0) {
+            H5Sclose(diskspace_id);
+            RETURN_WITH_ERROR(err_id);
+        }
+    }
+
+    /* create dataspace for memory and disk. */
+    /* memory is a flat array with the size on the slice. */
+    if ((memspace_id = H5Screate_simple(1, &len, NULL)) < 0) {
+        H5Sclose(diskspace_id);
+        RETURN_WITH_ERROR(memspace_id);
+    }
+
+    /* Write */
+    plist = H5Pcreate(H5P_DATASET_XFER);
+    /* H5Pset_dxpl_mpio(plist, H5FD_MPIO_COLLECTIVE); */
+    if ((err_id = H5Dwrite(dtset_id, mem_type_id, memspace_id, diskspace_id, plist, buf)) < 0) {
+        H5Pclose(plist);
+        H5Sclose(diskspace_id);
+        H5Sclose(memspace_id);
+        RETURN_WITH_ERROR(err_id);
+    }
+
+    H5Pclose(plist);
+    H5Sclose(diskspace_id);
+    H5Sclose(memspace_id);
+
+    return ESCDF_SUCCESS;
+}
+
+escdf_errno_t utils_hdf5_read_dataset(hid_t dtset_id,
+                                      void *buf,
+                                      hid_t mem_type_id,
+                                      const hsize_t *start,
+                                      const hsize_t *count,
+                                      const hsize_t *stride)
+{
+    hid_t memspace_id, diskspace_id, plist;
+    herr_t err_id;
+    hssize_t len;
+
+    /* disk use the start, count and stride. */
+    if ((diskspace_id = H5Dget_space(dtset_id)) < 0) {
+        RETURN_WITH_ERROR(diskspace_id);
+    }
+    
+    if (start && count) {
+        if ((err_id = H5Sselect_hyperslab(diskspace_id, H5S_SELECT_SET,
+                                          start, stride, count, NULL)) < 0) {
+            H5Sclose(diskspace_id);
+            RETURN_WITH_ERROR(err_id);
+        }
+    } else {
+        if ((err_id = H5Sselect_all(diskspace_id)) < 0) {
+            H5Sclose(diskspace_id);
+            RETURN_WITH_ERROR(err_id);
+        }
+    }
+    if ((len = H5Sget_select_npoints(diskspace_id)) < 0) {
+        H5Sclose(diskspace_id);
+        RETURN_WITH_ERROR(len);
+    }
+    if (!len) {
+        if ((err_id = H5Sselect_none(diskspace_id)) < 0) {
+            H5Sclose(diskspace_id);
+            RETURN_WITH_ERROR(err_id);
+        }
+    }
+
+    /* create dataspace for memory and disk. */
+    /* memory is a flat array with the size on the slice. */
+    if ((memspace_id = H5Screate_simple(1, &len, NULL)) < 0) {
+        H5Sclose(diskspace_id);
+        RETURN_WITH_ERROR(memspace_id);
+    }
+
+    /* Read */
+    plist = H5Pcreate(H5P_DATASET_XFER);
+    /* H5Pset_dxpl_mpio(plist, H5FD_MPIO_COLLECTIVE); */
+    if ((err_id = H5Dread(dtset_id, mem_type_id, memspace_id, diskspace_id, plist, buf)) < 0) {
+        H5Pclose(plist);
+        H5Sclose(diskspace_id);
+        H5Sclose(memspace_id);
+        RETURN_WITH_ERROR(err_id);
+    }
+
+    H5Pclose(plist);
+    H5Sclose(diskspace_id);
+    H5Sclose(memspace_id);
+
+    return ESCDF_SUCCESS;
+}
