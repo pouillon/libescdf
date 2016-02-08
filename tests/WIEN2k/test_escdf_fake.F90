@@ -11,9 +11,14 @@ program testf_escdf_fake
     character(kind=c_char, len=*), parameter :: test_wmode = C_CHAR_"w+"//C_NULL_CHAR
 
     type(fescdf_geometry_t) :: geometry
+    integer :: meta
 
     call fescdf_geometry_new(geometry, test_read, test_rmode)
     call fescdf_geometry_read_metadata(geometry)
+
+    call fescdf_geometry_get_number_of_physical_dimensions(geometry, meta)
+    write(*,'("META: ",a," = ",i4)') "number_of_physical_dimensions", meta
+
     call fescdf_geometry_set_file(geometry, test_write, test_wmode)
     call fescdf_geometry_write_metadata(geometry)
     call fescdf_geometry_free(geometry)

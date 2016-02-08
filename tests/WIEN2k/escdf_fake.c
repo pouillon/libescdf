@@ -142,3 +142,65 @@ void escdf_geometry_set_file(escdf_geometry_t *geometry, const char *path, const
     geometry-> fd = fopen(path, mode);
     assert(geometry->fd != NULL);
 }
+
+                    /**************************************/
+
+void escdf_geometry_get_number_of_physical_dimensions(escdf_geometry_t *geometry, int *meta) {
+
+    assert(geometry != NULL);
+    assert(meta != NULL);
+
+    *meta = geometry->number_of_physical_dimensions;
+}
+
+void escdf_geometry_get_absolute_or_reduced_coordinates(escdf_geometry_t *geometry, int *meta) {
+
+    assert(geometry != NULL);
+    assert(meta != NULL);
+
+    *meta = geometry->absolute_or_reduced_coordinates;
+}
+
+void escdf_geometry_get_dimension_types(escdf_geometry_t *geometry, int *meta, int dim_len) {
+    int i;
+
+    assert(geometry != NULL);
+    assert(meta != NULL);
+
+    for (i=0;i<dim_len;i++) {
+        meta[i] = geometry->dimension_types[i];
+    }
+}
+
+void escdf_geometry_get_embedded_system(escdf_geometry_t *geometry, char *meta) {
+
+    assert(geometry != NULL);
+    assert(meta != NULL);
+
+    strncpy(meta, geometry->embedded_system, 3);
+    meta[3] = '\0';
+}
+
+void escdf_geometry_get_space_group(escdf_geometry_t *geometry, int *meta) {
+
+    assert(geometry != NULL);
+    assert(meta != NULL);
+
+    *meta = geometry->space_group;
+}
+
+void escdf_geometry_get_number_of_sites(escdf_geometry_t *geometry, int *meta) {
+
+    assert(geometry != NULL);
+    assert(meta != NULL);
+
+    *meta = geometry->number_of_sites;
+}
+
+void escdf_geometry_get_number_of_species(escdf_geometry_t *geometry, int *meta) {
+
+    assert(geometry != NULL);
+    assert(meta != NULL);
+
+    *meta = geometry->number_of_species;
+}
