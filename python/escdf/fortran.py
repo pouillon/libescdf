@@ -85,43 +85,154 @@ class EscdfFortranInterface(object):
 
 # Fortran module default structure
 f03_mod_default = """\
-module escdf_@%group%@
+module fescdf_@%group%@
 
     use iso_c_binding
 
     implicit none
 
+    ! TODO: ensure line continuations are < 39
+    public :: &
+        fescdf_@%group%@_t, &
+        fescdf_@%group%@_new, &
+        fescdf_@%group%@_read_metadata, &
+        fescdf_@%group%@_write_metadata, &
+        fescdf_@%group%@_free, &
+        fescdf_@%group%@_set_file
+    @%public_objects%@
+
+    private :: &
+        c_to_f_string, &
+        c_to_f_string_ptr, &
+        f_to_c_string
+
+    type :: fescdf_@%group%@_t
+        private
+        type(c_ptr) :: ptr = C_NULL_PTR
+    end type fescdf_@%group%@_t
+
     interface
-        subroutine escdf_f03_@%group%@_new(@%group%@)
-            use iso_c_binding
-            implicit none
-            type(c_ptr), intent(out) :: @%group%@
-        end subroutine escdf_f03_@%group%@_new
+        subroutine escdf_@%group%@_new(@%group%@), bind(c)
+            import
+            type(c_ptr) :: @%group%@
+        end subroutine escdf_@%group%@_new
     end interface
     interface
-        subroutine escdf_f03_@%group%@_read_metadata(@%group%@)
-            use iso_c_binding
-            implicit none
-            type(c_ptr), intent(inout) :: @%group%@
-        end subroutine escdf_f03_@%group%@_read_metadata
+        subroutine escdf_@%group%@_read_metadata(@%group%@), bind(c)
+            import
+            type(c_ptr) :: @%group%@
+        end subroutine escdf_@%group%@_read_metadata
     end interface
     interface
-        subroutine escdf_f03_@%group%@_write_metadata(@%group%@)
-            use iso_c_binding
-            implicit none
-            type(c_ptr), intent(in) :: @%group%@
-        end subroutine escdf_f03_@%group%@_write_metadata
+        subroutine escdf_@%group%@_write_metadata(@%group%@), bind(c)
+            import
+            type(c_ptr) :: @%group%@
+        end subroutine escdf_@%group%@_write_metadata
     end interface
     interface
-        subroutine escdf_f03_@%group%@_free(@%group%@)
-            use iso_c_binding
-            implicit none
-            type(c_ptr), intent(inout) :: @%group%@
-        end subroutine escdf_f03_@%group%@_free
+        subroutine escdf_@%group%@_free(@%group%@), bind(c)
+            import
+            type(c_ptr) :: @%group%@
+        end subroutine escdf_@%group%@_free
     end interface
+
     @%interfaces%@
 
-end module escdf_@%group%@
+contains
+
+    subroutine fescdf_@%group%@_new(@%group%@, path, mode)
+        type(fescdf_@%group%@_t), intent(inout) :: @%group%@
+        character(kind=c_char, len=*), intent(in) :: path
+        character(kind=c_char, len=*), intent(in) :: mode
+
+        call escdf_@%group%@_new(@%group%@%ptr, path, mode)
+
+    end subroutine fescdf_@%group%@_new
+
+    subroutine fescdf_@%group%@_read_metadata(@%group%@)
+        type(fescdf_@%group%@_t), intent(inout) :: @%group%@
+
+        call escdf_@%group%@_read_metadata(@%group%@%ptr)
+
+    end subroutine fescdf_@%group%@_read_metadata
+
+    subroutine fescdf_@%group%@_write_metadata(@%group%@)
+        type(fescdf_@%group%@_t), intent(in) :: @%group%@
+
+        call escdf_@%group%@_write_metadata(@%group%@%ptr)
+
+    end subroutine fescdf_@%group%@_write_metadata
+
+    subroutine fescdf_@%group%@_free(@%group%@)
+        type(fescdf_@%group%@_t), intent(inout) :: @%group%@
+
+        call escdf_@%group%@_free(@%group%@%ptr)
+        @%group%@%ptr = C_NULL_PTR
+
+    end subroutine fescdf_@%group%@_free
+
+    @%wrappers%@
+
+                    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
+    ! Helper functions to convert between C and Fortran strings
+    ! Based on the routines by Joseph M. Krahn
+
+    subroutine c_to_f_string(c_string, f_string)
+
+        character(kind=c_char, len=1), intent(in) :: c_string(*)
+        character(len=*), intent(out) :: f_string
+
+        integer :: i
+
+        i = 1
+        do while(c_string(i) /= C_NULL_CHAR .and. i <= len(f_string))
+            f_string(i:i) = c_string(i)
+            i = i + 1
+        end do
+        if (i < len(f_string)) f_string(i:) = ' '
+
+    end subroutine c_to_f_string
+
+    subroutine c_to_f_string_ptr(c_string, f_string)
+
+        type(c_ptr), intent(in) :: c_string
+        character(len=*), intent(out) :: f_string
+
+        character(len=1, kind=c_char), pointer :: p_chars(:)
+        integer :: i
+
+        if (.not. c_associated(c_string)) then
+            f_string = ' '
+        else
+            call c_f_pointer(c_string, p_chars, [huge(0)])
+            i = 1
+            do while(p_chars(i) /= C_NULL_CHAR .and. i <= len(f_string))
+              f_string(i:i) = p_chars(i)
+              i = i + 1
+            end do
+            if (i < len(f_string)) f_string(i:) = ' '
+        end if
+
+    end subroutine c_to_f_string_ptr
+
+    function f_to_c_string(f_string) result(c_string)
+
+        character(len=*), intent(in) :: f_string
+        character(kind=c_char, len=1) :: c_string(len_trim(f_string)+1)
+            
+        integer :: i, strlen
+
+        strlen = len_trim(f_string)
+
+        forall (i=1:strlen)
+            c_string(i) = f_string(i:i)
+        end forall
+        c_string(strlen+1) = C_NULL_CHAR
+
+    end function f_to_c_string
+
+end module fescdf_@%group%@
 """
 
 
@@ -145,9 +256,14 @@ class EscdfFortranModule(object):
                 spec["action"] = action
                 f03_interfaces.append("%s" % EscdfFortranInterface(spec))
 
+        # Build Fortran wrappers
+        f03_wrappers = []
+
         # Substitute patterns
         self.patterns = {}
         self.patterns["group"] = self.group
+        self.patterns["public_objects"] = "public :: &\n    " + \
+            ", &\n    ".join(self.specs.get_all_functions())
         self.patterns["interfaces"] = "\n".join(f03_interfaces)
         self.f03_module = self.template.substitute(self.patterns)
 

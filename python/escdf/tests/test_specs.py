@@ -42,14 +42,14 @@ class TestEscdfSpecs(unittest.TestCase):
 
     def test_init_loads_text(self):
 
-        specs = EscdfSpecs(escdf_basic_specs)
+        specs = EscdfSpecs(escdf_basic_specs, "basic")
         yaml_data = yaml.load(escdf_basic_specs)
         assert ( len(yaml_data.keys()) == len(specs.yaml_data) )
 
 
     def test_elts_matches_yaml(self):
 
-        specs = EscdfSpecs(escdf_basic_specs)
+        specs = EscdfSpecs(escdf_basic_specs, "basic")
         chk_elts = list(set(specs.elts + specs.yaml_data.keys()))
         assert ( (len(chk_elts) == len(specs.elts)) and \
                  (len(chk_elts) == len(specs.yaml_data.keys())) )
@@ -57,13 +57,13 @@ class TestEscdfSpecs(unittest.TestCase):
 
     def test_get_spec_sets_name(self):
 
-        specs = EscdfSpecs(escdf_basic_specs)
+        specs = EscdfSpecs(escdf_basic_specs, "basic")
         assert ( "name" in specs.get_spec("metadata1") )
 
 
     def test_is_ref_detects_refs(self):
 
-        specs = EscdfSpecs(escdf_basic_specs)
+        specs = EscdfSpecs(escdf_basic_specs, "basic")
         assert ( (not specs.is_ref("metadata1")) and \
                  (specs.is_ref("@metadata1")) and \
                  (specs.is_ref("@dataset2(?)")) and \
@@ -72,7 +72,7 @@ class TestEscdfSpecs(unittest.TestCase):
 
     def test_is_ref_fixed_works(self):
 
-        specs = EscdfSpecs(escdf_basic_specs)
+        specs = EscdfSpecs(escdf_basic_specs, "basic")
         assert ( (specs.is_ref_fixed("@metadata1")) and \
                  (not specs.is_ref_fixed("@dataset2(?)")) and \
                  (not specs.is_ref_fixed("@wrong_ref")) )
@@ -80,7 +80,7 @@ class TestEscdfSpecs(unittest.TestCase):
 
     def test_is_ref_varying_works(self):
 
-        specs = EscdfSpecs(escdf_basic_specs)
+        specs = EscdfSpecs(escdf_basic_specs, "basic")
         assert ( (specs.is_ref_varying("@dataset2(?)")) and \
                  (not specs.is_ref_varying("@metadata1")) and \
                  (not specs.is_ref_varying("@wrong_ref")) )
